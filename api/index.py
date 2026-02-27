@@ -224,7 +224,7 @@ TEMPLATE = r"""
         <input type="hidden" name="action" value="ode" />
         <label>Función incógnita</label>
         <input name="unknown_name" value="{{ form.get('unknown_name', 'x(t)') }}" placeholder="x o x(t)" required />
-        <label>Ecuación diferencial ordinaria</label>
+        <label>Ecuación diferencial</label>
         <textarea name="ode_expr" rows="3" required>{{ form.get('ode_expr', "x''(t) + 5*x'(t) + 2*x(t) = 3*sin(t)") }}</textarea>
         {% set unk_label = form.get('unknown_name', 'x')|replace('(t)', '')|replace(' ', '') %}
         <label>Condiciones iniciales \([{{ unk_label }}(0), {{ unk_label }}'(0), ...]\)</label>
@@ -244,11 +244,11 @@ TEMPLATE = r"""
         <div class="result"><strong>Reemplazo de condiciones iniciales:</strong> \[ {{ results.ode_with_ics }} \]</div>
       {% endif %}
       {% if results.X_of_s %}
-        <div class="result"><strong>Solución en s:</strong> \[ {{ results.unknown_transform_name }}(s)={{ results.X_of_s }} \]</div>
+        <div class="result"><strong>Solución en el dominio de la frecuencia:</strong> \[ {{ results.unknown_transform_name }}(s)={{ results.X_of_s }} \]</div>
       {% endif %}
       {% if results.x_of_t %}
         <div class="result">
-          <strong>Solución temporal:</strong> \[ {{ results.unknown_name }}(t)={{ results.x_of_t }} \]
+          <strong>Solución en el dominio del tiempo:</strong> \[ {{ results.unknown_name }}(t)={{ results.x_of_t }} \]
           {% for hint in results.x_of_t_hints %}
             <div>{{ hint|safe }}</div>
           {% endfor %}
