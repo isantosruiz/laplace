@@ -228,7 +228,7 @@ TEMPLATE = r"""
         <textarea name="ode_expr" rows="3" required>{{ form.get('ode_expr', "x''(t) + 5*x'(t) + 2*x(t) = 3*sin(t)") }}</textarea>
         {% set unk_label = form.get('unknown_name', 'x')|replace('(t)', '')|replace(' ', '') %}
         <label>Condiciones iniciales \([{{ unk_label }}(0), {{ unk_label }}'(0), ...]\)</label>
-        <input name="ic_list" value="{{ form.get('ic_list', '[0,0]') }}" placeholder="[0,0]" />
+        <input name="ic_list" value="{{ form.get('ic_list', '[0, 0]') }}" placeholder="[0, 0]" />
         <button type="submit">Transformar y resolver</button>
       </form>
 
