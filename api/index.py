@@ -334,12 +334,15 @@ def _base_local_dict() -> dict:
         "DiracDelta": sp.DiracDelta,
         "exp": sp.exp,
         "sin": sp.sin,
+        "sen": sp.sin,
         "cos": sp.cos,
         "tan": sp.tan,
         "sqrt": sp.sqrt,
         "log": sp.log,
+        "log10": lambda x: sp.log(x, 10),
         "pi": sp.pi,
         "E": sp.E,
+        "e": sp.E,
     }
 
 
@@ -366,8 +369,9 @@ def _parse_math_keep_order(expr: str, extra_locals: dict | None = None):
 
 def _parse_equation(expr: str, extra_locals: dict | None = None) -> sp.Eq:
     if "=" not in expr:
-        raise ValueError("La ecuación diferencial debe incluir '='.")
-    lhs, rhs = expr.split("=", 1)
+        lhs, rhs = expr, "0"
+    else:
+        lhs, rhs = expr.split("=", 1)
     return sp.Eq(_parse_math(lhs, extra_locals), _parse_math(rhs, extra_locals))
 
 
@@ -375,6 +379,12 @@ def _clean_latex(tex: str) -> str:
     tex = re.sub(r"\\theta\s+\\left", r"\\theta\\left", tex)
     tex = re.sub(r"\\theta\s+\(", r"\\theta(", tex)
     tex = tex.replace(r"\theta\left(t\right)", r"\theta(t)")
+    tex = re.sub(r"([A-Za-z_]\w*)\^\{\((\d+)\)\(0\)\}", r"\1^{(\2)}(0)", tex)
+    tex = re.sub(
+        r"([A-Za-z_]\w*)\^\{\\left\((\d+)\\right\)\\left\(0\\right\)\}",
+        r"\1^{(\2)}(0)",
+        tex,
+    )
     tex = re.sub(r"([A-Z][A-Za-z0-9_]*\(s\))\s+s\^\{([^}]+)\}", r"s^{\2} \1", tex)
     tex = re.sub(r"([A-Z][A-Za-z0-9_]*\(s\))\s+s(?![A-Za-z])", r"s \1", tex)
     return tex
@@ -670,7 +680,10 @@ def home():
                 })
                 ode_s = ode_s.xreplace(ic_term_subs)
 
-                lhs_raw, rhs_raw = ode_raw.split("=", 1)
+                if "=" in ode_raw:
+                    lhs_raw, rhs_raw = ode_raw.split("=", 1)
+                else:
+                    lhs_raw, rhs_raw = ode_raw, "0"
                 lhs_display = _ordered_latex_from_input(lhs_raw, extra_locals={fname: unknown_fn})
                 rhs_display = _ordered_latex_from_input(rhs_raw, extra_locals={fname: unknown_fn})
                 lhs_transformed = _ordered_transformed_side_latex(
