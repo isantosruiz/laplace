@@ -218,7 +218,7 @@ TEMPLATE = r"""
     </div>
 
     <div class="card">
-      <h2>Resolución de ecuaciones diferenciales</h2>
+      <h2>Resolución de ecuaciones diferenciales lineales</h2>
       <p>Transforma ambos lados de la ecuación diferencial y resuelve la incógnita con transformada inversa.</p>
       <form method="post">
         <input type="hidden" name="action" value="ode" />
