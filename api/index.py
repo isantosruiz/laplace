@@ -219,7 +219,7 @@ TEMPLATE = r"""
 
     <div class="card">
       <h2>Resolución de ecuaciones diferenciales lineales de coeficientes constantes</h2>
-      <p>Transforma ambos lados de la ecuación diferencial y resuelve la incógnita con transformada inversa.</p>
+      <p>Transforma ambos lados de la ecuación diferencial y resuelve para la incógnita usando transformada inversa.</p>
       <form method="post">
         <input type="hidden" name="action" value="ode" />
         <label>Función incógnita</label>
