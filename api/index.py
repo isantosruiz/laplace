@@ -300,7 +300,7 @@ TEMPLATE = r"""
     </div>
   </div>
   <div style="text-align:center;color:#6b7280;font-size:0.9rem;padding:8px 20px 24px;">
-    &copy; 2026, <a href="https://isantosruiz.github.io/home/" target="_blank" rel="noopener noreferrer" style="color:#6b7280;text-decoration:none;">Ildeberto de los Santos Ruiz</a>
+    &copy; 2025, <a href="https://isantosruiz.github.io/home/" target="_blank" rel="noopener noreferrer" style="color:#6b7280;text-decoration:none;">Ildeberto de los Santos Ruiz</a>
   </div>
 </body>
 </html>
