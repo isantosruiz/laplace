@@ -203,7 +203,7 @@ TEMPLATE = r"""
       <form method="post">
         <input type="hidden" name="action" value="inverse" />
         <label>Expresión \(X(s)\)</label>
-        <input name="X_expr" value="{{ form.get('X_expr', '1/(s+2)') }}" placeholder="1/(s+2)" required />
+        <input name="X_expr" value="{{ form.get('X_expr', '1/(s+2)') }}" placeholder="1/(s^2+5*s+6)" required />
         <button type="submit">Calcular \(\mathscr{L}^{-1}\)</button>
       </form>
       {% if results.inverse_pair %}
