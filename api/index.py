@@ -39,20 +39,21 @@ TEMPLATE = r"""
   <title>Transformadas de Laplace</title>
   <style>
     :root {
-      --bg: #f2f4f7;
+      --bg: #eef5ff;
       --panel: #ffffff;
-      --ink: #111827;
-      --muted: #6b7280;
-      --accent: #1f3a5f;
-      --line: #e5e7eb;
-      --line-strong: #cfd4dd;
+      --ink: #0f2037;
+      --muted: #55708f;
+      --accent: #2467b3;
+      --accent-strong: #1d4f8a;
+      --line: #d8e5f4;
+      --line-strong: #b7cde7;
     }
     body {
       margin: 0;
       font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
       background:
-        radial-gradient(circle at 10% -10%, #ffffff 0%, #f6f8fb 38%, var(--bg) 100%),
-        linear-gradient(180deg, #f8fafc, #eef2f7);
+        radial-gradient(circle at 15% -10%, #ffffff 0%, #edf5ff 42%, var(--bg) 100%),
+        linear-gradient(180deg, #f5f9ff, #eaf2fc);
       color: var(--ink);
     }
     .wrap {
@@ -73,16 +74,48 @@ TEMPLATE = r"""
     .card {
       background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 20px;
       margin: 16px 0;
-      box-shadow: 0 10px 28px rgba(17, 24, 39, 0.06);
+      box-shadow:
+        0 10px 26px rgba(26, 66, 117, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    .card-body.hidden {
+      display: none;
+    }
+    .section-toggle {
+      width: 34px !important;
+      min-width: 34px;
+      height: 34px;
+      margin-top: 0 !important;
+      padding: 0;
+      border-radius: 7px;
+      font-size: 1.2rem;
+      font-weight: 400;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #e7f1ff;
+      color: var(--accent-strong);
+      border: 1px solid #c6dbf4;
+    }
+    .section-toggle:hover {
+      background: #d9e9fb;
     }
     .card h2 {
       margin: 0 0 8px;
       font-size: 1.4rem;
       font-weight: 700;
-      color: #1b4f8a;
+      color: #1f5ea4;
     }
     .card p {
       margin: 0 0 14px;
@@ -104,12 +137,17 @@ TEMPLATE = r"""
       border: 1px solid var(--line-strong);
       border-radius: 8px;
       font-size: 0.95rem;
-      background: #fff;
+      background: #fbfdff;
       color: var(--ink);
+    }
+    .mono-input {
+      font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: 0.94rem;
+      letter-spacing: 0.01em;
     }
     input:focus, textarea:focus {
       border-color: var(--accent);
-      outline: 2px solid rgba(31, 58, 95, 0.15);
+      outline: 2px solid rgba(36, 103, 179, 0.17);
       outline-offset: 1px;
     }
     button {
@@ -122,14 +160,14 @@ TEMPLATE = r"""
       transition: background-color 0.2s ease;
     }
     button:hover {
-      background: #172c48;
+      background: var(--accent-strong);
     }
     .result {
       margin-top: 14px;
       padding: 12px 13px;
       border: 1px solid var(--line);
       border-radius: 8px;
-      background: #fafbfd;
+      background: #f4f9ff;
       overflow-x: auto;
     }
     .result img {
@@ -169,119 +207,144 @@ TEMPLATE = r"""
       margin-top: 8px;
     }
     code {
-      background: #eef2f7;
+      background: #e7f1ff;
       padding: 2px 5px;
       border-radius: 4px;
-      color: #1f2937;
+      color: #214f86;
+    }
+    .footer-note {
+      text-align: center;
+      color: #5f7c9f;
+      font-size: 0.9rem;
+      margin-top: 10px;
+      padding: 10px 20px 14px;
+    }
+    .footer-note a {
+      color: inherit;
+      text-decoration: none;
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
+  {% set active_section = form.get('action', 'laplace') %}
   <div class="wrap">
     <h1>Calculadora de transformadas de Laplace</h1>
-    <p class="lead">Usa las variables <code>t</code> para el tiempo y <code>s</code> para la frecuencia.</p>
+    <p class="lead">Usa las literales <code>t</code> para el tiempo y <code>s</code> para la frecuencia.</p>
 
     <div class="card">
-      <h2>Del tiempo a la frecuencia</h2>
-      <p>Calcula la transformada de Laplace de una señal en el tiempo.</p>
-      <form method="post">
-        <input type="hidden" name="action" value="laplace" />
-        <label>Expresión \(x(t)\)</label>
-        <input name="x_expr" value="{{ form.get('x_expr', 'exp(-2*t)*sin(3*t)') }}" placeholder="exp(-2*t)*sin(3*t)" required />
-        <button type="submit">Calular \(\mathscr{L}\)</button>
-      </form>
-      {% if results.laplace_pair %}
-        <div class="result">\[ {{ results.laplace_pair }} \]</div>
-      {% endif %}
-      {% if errors.laplace %}<div class="error">{{ errors.laplace }}</div>{% endif %}
+      <div class="card-header">
+        <h2>Del tiempo a la frecuencia</h2>
+        <button type="button" class="section-toggle" data-target="laplace-body">&minus;</button>
+      </div>
+      <div id="laplace-body" class="card-body{% if active_section != 'laplace' %} hidden{% endif %}">
+        <p>Calcula la transformada de Laplace de una señal en el tiempo.</p>
+        <form method="post">
+          <input type="hidden" name="action" value="laplace" />
+          <label>Expresión \(x(t)\)</label>
+          <input class="mono-input" name="x_expr" value="{{ form.get('x_expr', 'exp(-2*t)*sin(3*t)') }}" placeholder="exp(-2*t)*sin(3*t)" required />
+          <button type="submit">Calcular \(\mathscr{L}\)</button>
+        </form>
+        {% if results.laplace_pair %}
+          <div class="result">\[ {{ results.laplace_pair }} \]</div>
+        {% endif %}
+        {% if errors.laplace %}<div class="error">{{ errors.laplace }}</div>{% endif %}
+      </div>
     </div>
 
     <div class="card">
-      <h2>De la frecuencia al tiempo</h2>
-      <p>Calcula la transformada inversa de Laplace para regresar al dominio temporal.</p>
-      <form method="post">
-        <input type="hidden" name="action" value="inverse" />
-        <label>Expresión \(X(s)\)</label>
-        <input name="X_expr" value="{{ form.get('X_expr', '1/(s+2)') }}" placeholder="1/(s^2+5*s+6)" required />
-        <button type="submit">Calcular \(\mathscr{L}^{-1}\)</button>
-      </form>
-      {% if results.inverse_pair %}
-        <div class="result">
-          \[ {{ results.inverse_pair }} \]
-          {% for hint in results.inverse_hints %}
-            <div>{{ hint|safe }}</div>
-          {% endfor %}
-        </div>
-      {% endif %}
-      {% if errors.inverse %}<div class="error">{{ errors.inverse }}</div>{% endif %}
-    </div>
-
-    <div class="card">
-      <h2>Resolución de ecuaciones diferenciales lineales de coeficientes constantes</h2>
-      <p>Transforma ambos lados de la ecuación diferencial y resuelve para la incógnita usando transformada inversa.</p>
-      <form method="post">
-        <input type="hidden" name="action" value="ode" />
-        <label>Función incógnita</label>
-        <input name="unknown_name" value="{{ form.get('unknown_name', 'x(t)') }}" placeholder="x o x(t)" required />
-        <label>Ecuación diferencial</label>
-        <textarea name="ode_expr" rows="3" required>{{ form.get('ode_expr', "x''(t) + 5*x'(t) + 2*x(t) = 3*sin(t)") }}</textarea>
-        {% set unk_label = form.get('unknown_name', 'x')|replace('(t)', '')|replace(' ', '') %}
-        <label>Condiciones iniciales \([{{ unk_label }}(0), {{ unk_label }}'(0), ...]\)</label>
-        <input name="ic_list" value="{{ form.get('ic_list', '[0, 0]') }}" placeholder="[0, 0]" />
-        <button type="submit">Transformar y resolver</button>
-      </form>
-
-      {% if results.ode_transform %}
-        <div class="result">
-          <strong>Ecuación transformada:</strong> \[ {{ results.ode_transform }} \]
-          {% if results.required_ics is defined %}
-            <div>Modelo de orden {{ results.required_ics }}, se usan {{ results.required_ics }} condiciones iniciales.</div>
-          {% endif %}
-        </div>
-      {% endif %}
-      {% if results.ode_with_ics %}
-        <div class="result"><strong>Reemplazo de condiciones iniciales:</strong> \[ {{ results.ode_with_ics }} \]</div>
-      {% endif %}
-      {% if results.X_of_s %}
-        <div class="result"><strong>Solución en el dominio de la frecuencia:</strong> \[ {{ results.unknown_transform_name }}(s)={{ results.X_of_s }} \]</div>
-      {% endif %}
-      {% if results.x_of_t %}
-        <div class="result">
-          <strong>Solución en el dominio del tiempo:</strong> \[ {{ results.unknown_name }}(t)={{ results.x_of_t }} \]
-          {% for hint in results.x_of_t_hints %}
-            <div>{{ hint|safe }}</div>
-          {% endfor %}
-        </div>
-      {% endif %}
-      {% if results.can_plot %}
-        {% if results.plot_requested %}
+      <div class="card-header">
+        <h2>De la frecuencia al tiempo</h2>
+        <button type="button" class="section-toggle" data-target="inverse-body">+</button>
+      </div>
+      <div id="inverse-body" class="card-body{% if active_section != 'inverse' %} hidden{% endif %}">
+        <p>Calcula la transformada inversa de Laplace para regresar al dominio temporal.</p>
+        <form method="post">
+          <input type="hidden" name="action" value="inverse" />
+          <label>Expresión \(X(s)\)</label>
+          <input class="mono-input" name="X_expr" value="{{ form.get('X_expr', '(2s+1)/(s^2+5s+6)') }}" placeholder="1/(s^2+5*s+6)" required />
+          <button type="submit">Calcular \(\mathscr{L}^{-1}\)</button>
+        </form>
+        {% if results.inverse_pair %}
           <div class="result">
-            {% if results.plot_data %}
-              <strong style="display:inline-block;margin-bottom:6px;">Gráfica de la solución:</strong><br/>
-              <img alt="Grafica de la solucion" src="data:image/png;base64,{{ results.plot_data }}" />
-            {% endif %}
-            <form method="post">
-              <input type="hidden" name="action" value="ode" />
-              <input type="hidden" name="unknown_name" value="{{ form.get('unknown_name', 'x') }}" />
-              <input type="hidden" name="ode_expr" value="{{ form.get('ode_expr', '') }}" />
-              <input type="hidden" name="ic_list" value="{{ form.get('ic_list', '') }}" />
-              <input type="hidden" name="plot_now" value="1" />
-              <div class="inline-controls">
-                <div>
-                  <label class="label-plain">Tiempo inicial</label>
-                  <input name="t_min" value="{{ results.t_min }}" placeholder="0" />
-                </div>
-                <div>
-                  <label class="label-plain">Tiempo final</label>
-                  <input name="t_max" value="{{ results.t_max }}" placeholder="10" />
-                </div>
-                <button type="submit">Actualizar gráfica</button>
-              </div>
-            </form>
+            \[ {{ results.inverse_pair }} \]
+            {% for hint in results.inverse_hints %}
+              <div>{{ hint|safe }}</div>
+            {% endfor %}
           </div>
-        {% else %}
+        {% endif %}
+        {% if errors.inverse %}<div class="error">{{ errors.inverse }}</div>{% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Resolución de ecuaciones diferenciales lineales de coeficientes constantes</h2>
+        <button type="button" class="section-toggle" data-target="ode-body">+</button>
+      </div>
+      <div id="ode-body" class="card-body{% if active_section != 'ode' %} hidden{% endif %}">
+        <p>Transforma ambos lados de la ecuación diferencial y resuelve para la incógnita usando transformada inversa.</p>
+        <form method="post">
+          <input type="hidden" name="action" value="ode" />
+          <label>Función incógnita</label>
+          <input class="mono-input" name="unknown_name" value="{{ form.get('unknown_name', 'x(t)') }}" placeholder="x o x(t)" required />
+          <label>Ecuación diferencial</label>
+          <textarea class="mono-input" name="ode_expr" rows="3" required>{{ form.get('ode_expr', "x''(t) + 5*x'(t) + 2*x(t) = 3*sin(t)") }}</textarea>
+          {% set unk_label = form.get('unknown_name', 'x')|replace('(t)', '')|replace(' ', '') %}
+          <label>Condiciones iniciales \([{{ unk_label }}(0), {{ unk_label }}'(0), ...]\)</label>
+          <input class="mono-input" name="ic_list" value="{{ form.get('ic_list', '[0, 0]') }}" placeholder="[0, 0]" />
+          <button type="submit">Transformar y resolver</button>
+        </form>
+
+        {% if results.ode_transform %}
           <div class="result">
+            <strong>Ecuación transformada:</strong> \[ {{ results.ode_transform }} \]
+            {% if results.required_ics is defined %}
+              <div>Modelo de orden {{ results.required_ics }}, se usan {{ results.required_ics }} condiciones iniciales.</div>
+            {% endif %}
+          </div>
+        {% endif %}
+        {% if results.ode_with_ics %}
+          <div class="result"><strong>Reemplazo de condiciones iniciales:</strong> \[ {{ results.ode_with_ics }} \]</div>
+        {% endif %}
+        {% if results.X_of_s %}
+          <div class="result"><strong>Solución en el dominio de la frecuencia:</strong> \[ {{ results.unknown_transform_name }}(s)={{ results.X_of_s }} \]</div>
+        {% endif %}
+        {% if results.x_of_t %}
+          <div class="result">
+            <strong>Solución en el dominio del tiempo:</strong> \[ {{ results.unknown_name }}(t)={{ results.x_of_t }} \]
+            {% for hint in results.x_of_t_hints %}
+              <div>{{ hint|safe }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% if results.can_plot %}
+          {% if results.plot_requested %}
+            <div class="result">
+              {% if results.plot_data %}
+                <strong style="display:inline-block;margin-bottom:6px;">Gráfica de la solución:</strong><br/>
+                <img alt="Grafica de la solucion" src="data:image/png;base64,{{ results.plot_data }}" />
+              {% endif %}
+              <form method="post">
+                <input type="hidden" name="action" value="ode" />
+                <input type="hidden" name="unknown_name" value="{{ form.get('unknown_name', 'x') }}" />
+                <input type="hidden" name="ode_expr" value="{{ form.get('ode_expr', '') }}" />
+                <input type="hidden" name="ic_list" value="{{ form.get('ic_list', '') }}" />
+                <input type="hidden" name="plot_now" value="1" />
+                <div class="inline-controls">
+                  <div>
+                    <label class="label-plain">Tiempo inicial</label>
+                    <input class="mono-input" name="t_min" value="{{ results.t_min }}" placeholder="0" />
+                  </div>
+                  <div>
+                    <label class="label-plain">Tiempo final</label>
+                    <input class="mono-input" name="t_max" value="{{ results.t_max }}" placeholder="10" />
+                  </div>
+                  <button type="submit">Actualizar gráfica</button>
+                </div>
+              </form>
+            </div>
+          {% else %}
             <form method="post">
               <input type="hidden" name="action" value="ode" />
               <input type="hidden" name="unknown_name" value="{{ form.get('unknown_name', 'x') }}" />
@@ -290,18 +353,34 @@ TEMPLATE = r"""
               <input type="hidden" name="plot_now" value="1" />
               <button type="submit">Graficar la solución</button>
             </form>
-          </div>
+          {% endif %}
         {% endif %}
-      {% endif %}
-      {% if results.plot_note %}
-        <div class="result">{{ results.plot_note }}</div>
-      {% endif %}
-      {% if errors.ode %}<div class="error">{{ errors.ode }}</div>{% endif %}
+        {% if results.plot_note %}
+          <div class="result">{{ results.plot_note }}</div>
+        {% endif %}
+        {% if errors.ode %}<div class="error">{{ errors.ode }}</div>{% endif %}
+      </div>
     </div>
   </div>
-  <div style="text-align:center;color:#6b7280;font-size:0.9rem;padding:8px 20px 24px;">
-    &copy; 2025, <a href="https://isantosruiz.github.io/home/" target="_blank" rel="noopener noreferrer" style="color:#6b7280;text-decoration:none;">Ildeberto de los Santos Ruiz</a>
-  </div>
+  <footer class="footer-note">
+    &copy; 2025, <a href="https://isantosruiz.github.io/home/" target="_blank" rel="noopener noreferrer">Ildeberto de los Santos Ruiz</a>
+  </footer>
+  <script>
+    const MINUS = "\u2212";
+    document.querySelectorAll(".section-toggle").forEach((btn) => {
+      const body = document.getElementById(btn.dataset.target);
+      const syncSymbol = () => {
+        if (!body) return;
+        btn.textContent = body.classList.contains("hidden") ? "+" : MINUS;
+      };
+      syncSymbol();
+      btn.addEventListener("click", () => {
+        if (!body) return;
+        body.classList.toggle("hidden");
+        syncSymbol();
+      });
+    });
+  </script>
 </body>
 </html>
 """
