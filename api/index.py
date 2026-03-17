@@ -1,4 +1,6 @@
 import base64
+import datetime
+import html
 import io
 import os
 import re
@@ -165,6 +167,20 @@ TEMPLATE = r"""
     button:hover {
       background: var(--accent-strong);
     }
+    .secondary-btn {
+      background: #e7f1ff;
+      color: var(--accent-strong);
+      border: 1px solid #c6dbf4;
+    }
+    .secondary-btn:hover {
+      background: #d9e9fb;
+    }
+    .report-btn {
+      width: auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
     .result {
       margin-top: 14px;
       padding: 12px 13px;
@@ -240,7 +256,7 @@ TEMPLATE = r"""
         <h2>Del tiempo a la frecuencia</h2>
         <button type="button" class="section-toggle" data-target="laplace-body">&minus;</button>
       </div>
-      <div id="laplace-body" class="card-body{% if active_section != 'laplace' %} hidden{% endif %}">
+      <div id="laplace-body" class="card-body{% if active_section not in ['laplace'] %} hidden{% endif %}">
         <p>Calcula la transformada de Laplace de una señal en el tiempo.</p>
         <form method="post">
           <input type="hidden" name="action" value="laplace" />
@@ -260,7 +276,7 @@ TEMPLATE = r"""
         <h2>De la frecuencia al tiempo</h2>
         <button type="button" class="section-toggle" data-target="inverse-body">+</button>
       </div>
-      <div id="inverse-body" class="card-body{% if active_section != 'inverse' %} hidden{% endif %}">
+      <div id="inverse-body" class="card-body{% if active_section not in ['inverse'] %} hidden{% endif %}">
         <p>Calcula la transformada inversa de Laplace para regresar al dominio temporal.</p>
         <form method="post">
           <input type="hidden" name="action" value="inverse" />
@@ -285,7 +301,7 @@ TEMPLATE = r"""
         <h2>Ecuaciones diferenciales lineales de coeficientes constantes</h2>
         <button type="button" class="section-toggle" data-target="ode-body">+</button>
       </div>
-      <div id="ode-body" class="card-body{% if active_section != 'ode' %} hidden{% endif %}">
+      <div id="ode-body" class="card-body{% if active_section not in ['ode', 'ode_report'] %} hidden{% endif %}">
         <p>Transforma ambos lados de la ecuación diferencial y resuelve para la incógnita usando transformada inversa.</p>
         <form method="post">
           <input type="hidden" name="action" value="ode" />
@@ -320,6 +336,15 @@ TEMPLATE = r"""
               <div>{{ hint|safe }}</div>
             {% endfor %}
           </div>
+          <form method="post" target="_blank">
+            <input type="hidden" name="action" value="ode_report" />
+            <input type="hidden" name="unknown_name" value="{{ form.get('unknown_name', '') }}" />
+            <input type="hidden" name="ode_expr" value="{{ form.get('ode_expr', '') }}" />
+            <input type="hidden" name="ic_list" value="{{ form.get('ic_list', '') }}" />
+            <input type="hidden" name="t_min" value="{{ results.get('t_min', form.get('t_min', '0')) }}" />
+            <input type="hidden" name="t_max" value="{{ results.get('t_max', form.get('t_max', '10')) }}" />
+            <button type="submit" class="secondary-btn report-btn">Crear reporte PDF</button>
+          </form>
         {% endif %}
         {% if results.can_plot %}
           {% if results.plot_requested %}
@@ -705,6 +730,333 @@ def _plot_solution(expr, unknown_name: str, t_min: float = 0.0, t_max: float = 1
         return None
 
 
+def _solve_ode_action(form) -> tuple[dict, dict]:
+    results: dict = {}
+
+    fname = _validate_unknown_name(form.get("unknown_name", "x"))
+    unknown_fn = sp.Function(fname)
+    transform_name = fname[0].upper() + fname[1:]
+    unknown_s = sp.Symbol(f"{transform_name}(s)")
+    ode_raw = form.get("ode_expr", "")
+
+    ode = _parse_equation(ode_raw, extra_locals={fname: unknown_fn})
+    ode_order = max(_derivative_order(ode.lhs, unknown_fn), _derivative_order(ode.rhs, unknown_fn))
+    results["required_ics"] = ode_order
+
+    ic_raw = form.get("ic_list", "")
+    ic_values = _parse_ic_list(ic_raw, ode_order, extra_locals={fname: unknown_fn})
+    ic_term_subs = {}
+    ic_value_subs = {}
+    for k in range(ode_order):
+        if k == 0:
+            original = unknown_fn(0)
+        else:
+            original = sp.Subs(sp.Derivative(unknown_fn(t), (t, k)), t, 0)
+        placeholder = _ic_placeholder(k, fname)
+        ic_term_subs[original] = placeholder
+        ic_value_subs[placeholder] = ic_values[k]
+
+    lhs_s = sp.laplace_transform(ode.lhs, t, s, noconds=True)
+    rhs_s = sp.laplace_transform(ode.rhs, t, s, noconds=True)
+    ode_s = sp.Eq(lhs_s, rhs_s).xreplace({
+        LaplaceTransform(unknown_fn(t), t, s): unknown_s,
+    })
+    ode_s = ode_s.xreplace(ic_term_subs)
+
+    if "=" in ode_raw:
+        lhs_raw, rhs_raw = ode_raw.split("=", 1)
+    else:
+        lhs_raw, rhs_raw = ode_raw, "0"
+    lhs_display = _ordered_latex_from_input(lhs_raw, extra_locals={fname: unknown_fn})
+    rhs_display = _ordered_latex_from_input(rhs_raw, extra_locals={fname: unknown_fn})
+    lhs_transformed = _ordered_transformed_side_latex(lhs_raw, fname, unknown_fn, unknown_s, ic_term_subs)
+    rhs_transformed = _ordered_transformed_side_latex(rhs_raw, fname, unknown_fn, unknown_s, ic_term_subs)
+    laplace_step = (
+        r"\mathscr{L}\left\{" + lhs_display + r"\right\} = "
+        r"\mathscr{L}\left\{" + rhs_display + r"\right\}"
+    )
+    results["ode_transform"] = (
+        r"\begin{aligned}"
+        + laplace_step
+        + r"\\ \Rightarrow\quad "
+        + lhs_transformed
+        + r" = "
+        + rhs_transformed
+        + r"\end{aligned}"
+    )
+
+    ode_s_ic = ode_s.subs(ic_value_subs)
+    results["ode_with_ics"] = _clean_latex(sp.latex(ode_s_ic))
+
+    x_sol = sp.solve(ode_s_ic, unknown_s)
+    if not x_sol:
+        raise ValueError("No se pudo despejar la transformada de la función desconocida.")
+
+    X_expr = sp.simplify(x_sol[0])
+    x_time = sp.inverse_laplace_transform(X_expr, s, t)
+
+    results["unknown_name"] = fname
+    results["unknown_transform_name"] = transform_name
+    results["X_of_s"] = _to_latex(X_expr)
+    results["x_of_t"] = _to_latex(x_time)
+    results["x_of_t_hints"] = _inverse_hints(x_time)
+
+    results["can_plot"] = not x_time.has(sp.DiracDelta) and not (x_time.free_symbols - {t})
+    results["plot_requested"] = form.get("plot_now", "") == "1"
+    t_min_raw = (form.get("t_min", "") or "").strip()
+    t_max_raw = (form.get("t_max", "") or "").strip()
+    t_min = 0.0 if t_min_raw == "" else float(t_min_raw)
+    t_max = 10.0 if t_max_raw == "" else float(t_max_raw)
+    results["t_min"] = sp.nsimplify(t_min) if t_min.is_integer() else t_min
+    results["t_max"] = sp.nsimplify(t_max) if t_max.is_integer() else t_max
+    if not t_max > t_min:
+        raise ValueError("El límite superior de tiempo debe ser mayor que el límite inferior.")
+
+    if results["plot_requested"]:
+        plot_data = _plot_solution(x_time, fname, t_min=t_min, t_max=t_max)
+        if plot_data:
+            results["plot_data"] = plot_data
+
+    if results["plot_requested"] and (x_time.free_symbols - {t}):
+        results["plot_note"] = (
+            r"La solución depende de parámetros simbólicos además de \(t\); "
+            r"se requieren valores numéricos para poder graficar."
+        )
+
+    report_data = {
+        "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "unknown_name": fname,
+        "unknown_transform_name": transform_name,
+        "ode_expr": ode_raw,
+        "ode_input_latex": f"{lhs_display} = {rhs_display}",
+        "ic_list": ic_raw,
+        "ic_list_latex": (
+            r"\left[" + ", ".join(_to_latex(value) for value in ic_values) + r"\right]"
+            if ic_values
+            else r"\left[\right]"
+        ),
+        "required_ics": ode_order,
+        "ode_transform": results["ode_transform"],
+        "ode_with_ics": results["ode_with_ics"],
+        "X_of_s": results["X_of_s"],
+        "x_of_t": results["x_of_t"],
+        "t_min": t_min,
+        "t_max": t_max,
+        "plot_data": results.get("plot_data"),
+    }
+
+    if report_data["plot_data"] is None and results["can_plot"]:
+        report_data["plot_data"] = _plot_solution(x_time, fname, t_min=t_min, t_max=t_max)
+
+    return results, report_data
+
+
+def _escape_html(value) -> str:
+    return html.escape(str(value), quote=True)
+
+
+def _report_math_line(latex_text: str) -> str:
+    return f'<div class="report-math">\\[{latex_text}\\]</div>'
+
+
+def _report_section(title: str, content_html: str) -> str:
+    return f'<section class="report-section"><h2>{title}</h2>{content_html}</section>'
+
+
+def _build_ode_report_html(report_data: dict) -> str:
+    unknown_name = _escape_html(report_data["unknown_name"])
+    unknown_transform_name = _escape_html(report_data["unknown_transform_name"])
+    generated_at = _escape_html(report_data["generated_at"])
+    required_ics = _escape_html(report_data["required_ics"])
+    t_min = _escape_html(report_data["t_min"])
+    t_max = _escape_html(report_data["t_max"])
+
+    input_section = _report_section(
+        "Datos de entrada",
+        "".join(
+            [
+                '<div class="report-line"><strong>Función incógnita:</strong></div>',
+                _report_math_line(f"{unknown_name}(t)"),
+                '<div class="report-line"><strong>Ecuación diferencial:</strong></div>',
+                _report_math_line(report_data["ode_input_latex"]),
+                '<div class="report-line"><strong>Condiciones iniciales:</strong></div>',
+                _report_math_line(report_data["ic_list_latex"]),
+                '<div class="report-line"><strong>Condiciones requeridas:</strong></div>',
+                _report_math_line(str(required_ics)),
+            ]
+        ),
+    )
+
+    process_steps = "".join(
+        [
+            _report_section("1. Ecuación transformada", _report_math_line(report_data["ode_transform"])),
+            _report_section("2. Reemplazo de condiciones iniciales", _report_math_line(report_data["ode_with_ics"])),
+            _report_section(
+                "3. Solución en el dominio de la frecuencia",
+                _report_math_line(f"{unknown_transform_name}(s) = {report_data['X_of_s']}"),
+            ),
+            _report_section(
+                "4. Solución en el dominio del tiempo",
+                _report_math_line(f"{unknown_name}(t) = {report_data['x_of_t']}"),
+            ),
+        ]
+    )
+
+    plot_html = ""
+    if report_data.get("plot_data"):
+        plot_html = _report_section(
+            "5. Gráfica de la solución",
+            (
+                f'<div class="report-figure"><img alt="Grafica de la solucion" src="data:image/png;base64,{report_data["plot_data"]}" /></div>'
+                f'<div class="report-line">Rango graficado: t = {t_min} a t = {t_max}</div>'
+            ),
+        )
+
+    return f"""<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reporte de transformada de Laplace</title>
+    <style>
+      :root {{
+        --bg: #edf5ff;
+        --panel: #ffffff;
+        --ink: #10243c;
+        --muted: #56708f;
+        --line: #d7e5f3;
+      }}
+      * {{
+        box-sizing: border-box;
+      }}
+      body {{
+        margin: 0;
+        font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        background: linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
+        color: var(--ink);
+      }}
+      .toolbar {{
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        padding: 12px 16px;
+        background: rgba(248, 252, 255, 0.92);
+        border-bottom: 1px solid var(--line);
+      }}
+      .toolbar button {{
+        border: 1px solid #2b6cb0;
+        border-radius: 8px;
+        padding: 8px 14px;
+        background: #2b6cb0;
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+      }}
+      .report {{
+        max-width: 960px;
+        margin: 20px auto;
+        padding: 16px 18px 24px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        box-shadow: 0 10px 24px rgba(22, 54, 91, 0.08);
+      }}
+      h1 {{
+        margin: 0;
+        color: #1f5ea4;
+      }}
+      .meta {{
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }}
+      .report-section {{
+        margin-top: 16px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px 14px;
+        background: #f6faff;
+      }}
+      .report-section h2 {{
+        margin: 0 0 8px;
+        font-size: 1.05rem;
+        color: #1f5ea4;
+      }}
+      .report-line {{
+        margin: 8px 0 4px;
+      }}
+      .report-math {{
+        margin: 4px 0 8px;
+        overflow-x: auto;
+      }}
+      .report-figure {{
+        margin-top: 8px;
+      }}
+      .report-figure img {{
+        width: 100%;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: white;
+      }}
+      .report-footer {{
+        margin-top: 16px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.85rem;
+        padding-top: 6px;
+      }}
+      .report-footer a {{
+        color: #1f5ea8;
+        text-decoration: none;
+      }}
+      @media print {{
+        .toolbar {{ display: none; }}
+        .report {{
+          max-width: none;
+          margin: 0;
+          padding: 8mm 8mm 10mm;
+        }}
+        .report-section {{
+          break-inside: avoid;
+        }}
+      }}
+    </style>
+    <script>
+      window.MathJax = {{
+        tex: {{ inlineMath: [["$", "$"], ["\\\\(", "\\\\)"]] }},
+        svg: {{ fontCache: "global" }},
+      }};
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+    <script>
+      window.addEventListener("load", () => {{
+        const runPrint = () => setTimeout(() => window.print(), 250);
+        if (window.MathJax?.typesetPromise) {{
+          window.MathJax.typesetPromise().then(runPrint).catch(runPrint);
+          return;
+        }}
+        runPrint();
+      }});
+    </script>
+  </head>
+  <body>
+    <div class="toolbar">
+      <button type="button" onclick="window.print()">Imprimir / Guardar PDF</button>
+    </div>
+    <main class="report">
+      <h1>Reporte de transformada de Laplace</h1>
+      <div class="meta">Generado: {generated_at}</div>
+      {input_section}
+      {_report_section("Proceso paso a paso", process_steps)}
+      {plot_html}
+      <footer class="report-footer">
+        &copy; 2026, <a href="https://isantosruiz.github.io/home/" target="_blank" rel="noopener noreferrer">Ildeberto de los Santos Ruiz</a>
+      </footer>
+    </main>
+  </body>
+</html>"""
+
+
 @app.route("/", methods=["GET", "POST"])
 def home():
     results = {}
@@ -731,99 +1083,17 @@ def home():
             except Exception as exc:
                 errors["inverse"] = f"Error al calcular la inversa: {exc}"
 
-        elif action == "ode":
+        elif action in {"ode", "ode_report"}:
             try:
-                fname = _validate_unknown_name(form.get("unknown_name", "x"))
-                unknown_fn = sp.Function(fname)
-                transform_name = fname[0].upper() + fname[1:]
-                unknown_s = sp.Symbol(f"{transform_name}(s)")
-                ode_raw = form.get("ode_expr", "")
+                ode_results, report_data = _solve_ode_action(form)
+                results.update(ode_results)
 
-                ode = _parse_equation(ode_raw, extra_locals={fname: unknown_fn})
-                ode_order = max(_derivative_order(ode.lhs, unknown_fn), _derivative_order(ode.rhs, unknown_fn))
-                results["required_ics"] = ode_order
-
-                ic_values = _parse_ic_list(form.get("ic_list", ""), ode_order, extra_locals={fname: unknown_fn})
-                ic_term_subs = {}
-                ic_value_subs = {}
-                for k in range(ode_order):
-                    if k == 0:
-                        original = unknown_fn(0)
-                    else:
-                        original = sp.Subs(sp.Derivative(unknown_fn(t), (t, k)), t, 0)
-                    placeholder = _ic_placeholder(k, fname)
-                    ic_term_subs[original] = placeholder
-                    ic_value_subs[placeholder] = ic_values[k]
-
-                lhs_s = sp.laplace_transform(ode.lhs, t, s, noconds=True)
-                rhs_s = sp.laplace_transform(ode.rhs, t, s, noconds=True)
-                ode_s = sp.Eq(lhs_s, rhs_s).xreplace({
-                    LaplaceTransform(unknown_fn(t), t, s): unknown_s,
-                })
-                ode_s = ode_s.xreplace(ic_term_subs)
-
-                if "=" in ode_raw:
-                    lhs_raw, rhs_raw = ode_raw.split("=", 1)
-                else:
-                    lhs_raw, rhs_raw = ode_raw, "0"
-                lhs_display = _ordered_latex_from_input(lhs_raw, extra_locals={fname: unknown_fn})
-                rhs_display = _ordered_latex_from_input(rhs_raw, extra_locals={fname: unknown_fn})
-                lhs_transformed = _ordered_transformed_side_latex(
-                    lhs_raw, fname, unknown_fn, unknown_s, ic_term_subs
-                )
-                rhs_transformed = _ordered_transformed_side_latex(
-                    rhs_raw, fname, unknown_fn, unknown_s, ic_term_subs
-                )
-                laplace_step = (
-                    r"\mathscr{L}\left\{" + lhs_display + r"\right\} = "
-                    r"\mathscr{L}\left\{" + rhs_display + r"\right\}"
-                )
-                results["ode_transform"] = (
-                    r"\begin{aligned}"
-                    + laplace_step
-                    + r"\\ \Rightarrow\quad "
-                    + lhs_transformed
-                    + r" = "
-                    + rhs_transformed
-                    + r"\end{aligned}"
-                )
-
-                ode_s_ic = ode_s.subs(ic_value_subs)
-                results["ode_with_ics"] = _clean_latex(sp.latex(ode_s_ic))
-
-                x_sol = sp.solve(ode_s_ic, unknown_s)
-                if not x_sol:
-                    raise ValueError("No se pudo despejar la transformada de la función desconocida.")
-
-                X_expr = sp.simplify(x_sol[0])
-                x_time = sp.inverse_laplace_transform(X_expr, s, t)
-
-                results["unknown_name"] = fname
-                results["unknown_transform_name"] = transform_name
-                results["X_of_s"] = _to_latex(X_expr)
-                results["x_of_t"] = _to_latex(x_time)
-                results["x_of_t_hints"] = _inverse_hints(x_time)
-
-                results["can_plot"] = not x_time.has(sp.DiracDelta) and not (x_time.free_symbols - {t})
-                results["plot_requested"] = form.get("plot_now", "") == "1"
-                t_min_raw = (form.get("t_min", "") or "").strip()
-                t_max_raw = (form.get("t_max", "") or "").strip()
-                t_min = 0.0 if t_min_raw == "" else float(t_min_raw)
-                t_max = 10.0 if t_max_raw == "" else float(t_max_raw)
-                results["t_min"] = sp.nsimplify(t_min) if t_min.is_integer() else t_min
-                results["t_max"] = sp.nsimplify(t_max) if t_max.is_integer() else t_max
-                if not t_max > t_min:
-                    raise ValueError("El límite superior de tiempo debe ser mayor que el límite inferior.")
-
-                if results["plot_requested"]:
-                    plot_data = _plot_solution(x_time, fname, t_min=t_min, t_max=t_max)
-                    if plot_data:
-                        results["plot_data"] = plot_data
-
-                if results["plot_requested"] and (x_time.free_symbols - {t}):
-                    results["plot_note"] = (
-                        r"La solución depende de parámetros simbólicos además de \(t\); "
-                        r"se requieren valores numéricos para poder graficar."
+                if action == "ode_report":
+                    report_html = _build_ode_report_html(report_data)
+                    return app.response_class(
+                        response=report_html,
+                        status=200,
+                        mimetype="text/html",
                     )
 
             except Exception as exc:
