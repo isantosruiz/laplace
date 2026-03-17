@@ -844,10 +844,11 @@ def _solve_ode_action(form) -> tuple[dict, dict]:
         "x_of_t": results["x_of_t"],
         "t_min": t_min,
         "t_max": t_max,
-        "plot_data": results.get("plot_data"),
+        "plot_requested": results["plot_requested"],
+        "plot_data": results.get("plot_data") if results["plot_requested"] else None,
     }
 
-    if report_data["plot_data"] is None and results["can_plot"]:
+    if report_data["plot_data"] is None and results["plot_requested"] and results["can_plot"]:
         report_data["plot_data"] = _plot_solution(x_time, fname, t_min=t_min, t_max=t_max)
 
     return results, report_data
@@ -934,7 +935,7 @@ def _build_ode_report_html(report_data: dict) -> str:
       body {{
         margin: 0;
         font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-        background: linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
+        background: #ffffff;
         color: var(--ink);
       }}
       .toolbar {{
@@ -942,7 +943,7 @@ def _build_ode_report_html(report_data: dict) -> str:
         top: 0;
         z-index: 5;
         padding: 12px 16px;
-        background: rgba(248, 252, 255, 0.92);
+        background: rgba(255, 255, 255, 0.92);
         border-bottom: 1px solid var(--line);
       }}
       .toolbar button {{
