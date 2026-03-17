@@ -975,7 +975,7 @@ def _build_ode_report_html(report_data: dict) -> str:
         border: 1px solid var(--line);
         border-radius: 10px;
         padding: 12px 14px;
-        background: #f6faff;
+        background: #ffffff;
       }}
       .report-section h2 {{
         margin: 0 0 8px;
