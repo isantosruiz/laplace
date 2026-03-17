@@ -385,6 +385,7 @@ TEMPLATE = r"""
             <input type="hidden" name="ic_list" value="{{ form.get('ic_list', '') }}" />
             <input type="hidden" name="t_min" value="{{ results.get('t_min', form.get('t_min', '0')) }}" />
             <input type="hidden" name="t_max" value="{{ results.get('t_max', form.get('t_max', '10')) }}" />
+            <input type="hidden" name="plot_now" value="{{ '1' if results.get('plot_requested') else '' }}" />
             <button type="submit" class="secondary-btn report-btn">Crear reporte PDF</button>
           </form>
         {% endif %}
