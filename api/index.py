@@ -59,7 +59,10 @@ TEMPLATE = r"""
     .wrap {
       max-width: 1024px;
       margin: 34px auto;
-      padding: 0 20px 24px;
+      padding: 0 20px 0;
+    }
+    .wrap .card:last-child {
+      margin-bottom: 0;
     }
     h1 {
       margin: 0;
@@ -216,8 +219,8 @@ TEMPLATE = r"""
       text-align: center;
       color: #5f7c9f;
       font-size: 0.9rem;
-      margin-top: 10px;
-      padding: 10px 20px 14px;
+      margin-top: 0;
+      padding: 0 20px 10px;
     }
     .footer-note a {
       color: inherit;
@@ -279,7 +282,7 @@ TEMPLATE = r"""
 
     <div class="card">
       <div class="card-header">
-        <h2>Resolución de ecuaciones diferenciales lineales de coeficientes constantes</h2>
+        <h2>Ecuaciones diferenciales lineales de coeficientes constantes</h2>
         <button type="button" class="section-toggle" data-target="ode-body">+</button>
       </div>
       <div id="ode-body" class="card-body{% if active_section != 'ode' %} hidden{% endif %}">
