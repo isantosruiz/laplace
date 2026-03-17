@@ -336,15 +336,6 @@ TEMPLATE = r"""
               <div>{{ hint|safe }}</div>
             {% endfor %}
           </div>
-          <form method="post" target="_blank">
-            <input type="hidden" name="action" value="ode_report" />
-            <input type="hidden" name="unknown_name" value="{{ form.get('unknown_name', '') }}" />
-            <input type="hidden" name="ode_expr" value="{{ form.get('ode_expr', '') }}" />
-            <input type="hidden" name="ic_list" value="{{ form.get('ic_list', '') }}" />
-            <input type="hidden" name="t_min" value="{{ results.get('t_min', form.get('t_min', '0')) }}" />
-            <input type="hidden" name="t_max" value="{{ results.get('t_max', form.get('t_max', '10')) }}" />
-            <button type="submit" class="secondary-btn report-btn">Crear reporte PDF</button>
-          </form>
         {% endif %}
         {% if results.can_plot %}
           {% if results.plot_requested %}
@@ -385,6 +376,17 @@ TEMPLATE = r"""
         {% endif %}
         {% if results.plot_note %}
           <div class="result">{{ results.plot_note }}</div>
+        {% endif %}
+        {% if results.x_of_t %}
+          <form method="post" target="_blank">
+            <input type="hidden" name="action" value="ode_report" />
+            <input type="hidden" name="unknown_name" value="{{ form.get('unknown_name', '') }}" />
+            <input type="hidden" name="ode_expr" value="{{ form.get('ode_expr', '') }}" />
+            <input type="hidden" name="ic_list" value="{{ form.get('ic_list', '') }}" />
+            <input type="hidden" name="t_min" value="{{ results.get('t_min', form.get('t_min', '0')) }}" />
+            <input type="hidden" name="t_max" value="{{ results.get('t_max', form.get('t_max', '10')) }}" />
+            <button type="submit" class="secondary-btn report-btn">Crear reporte PDF</button>
+          </form>
         {% endif %}
         {% if errors.ode %}<div class="error">{{ errors.ode }}</div>{% endif %}
       </div>
@@ -954,12 +956,8 @@ def _build_ode_report_html(report_data: dict) -> str:
       }}
       .report {{
         max-width: 960px;
-        margin: 20px auto;
+        margin: 0 auto;
         padding: 16px 18px 24px;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        box-shadow: 0 10px 24px rgba(22, 54, 91, 0.08);
       }}
       h1 {{
         margin: 0;
